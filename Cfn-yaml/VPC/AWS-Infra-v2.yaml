@@ -1,42 +1,55 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: Creates two-subnets in VPC (Public w/ NAT gateway and Private )
+Description: Creates a two-subnet VPC (public w/ NAT gateway and private) (c)
+  2017 Air11 Technology LLC -- licensed under the Apache OpenSource 2.0 license,
+  https://opensource.org/licenses/Apache-2.0
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label:
-          default: VPC Configuration Parameters
+          default: VPC configuration parameters
         Parameters:
+          - VPCNAME
           - VPCCIDR
           - PublicSubnetCIDR
           - SSHLocation
     ParameterLabels:
+      VPCNAME:
+        default: Name of new VPC
       VPCCIDR:
-        default: Enter CIDR of New VPC
+        default: Enter CIDR of new VPC
       PublicSubnetCIDR:
-        default: Enter CIDR of the Public Subnet
+        default: Enter CIDR of the public subnet
       SSHLocation:
-        default: Subnet Allowed to SSH on TCP to Public Subnet
+        default: Subnet allowed to ssh on TCP to public subnet
 Parameters:
+  VPCNAME:
+    Default: STACKSET-VPC
+    Description: VPC NAME
+    Type: String
   VPCCIDR:
     AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
     ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
-    Description: CIDR block for entire VPC
-    Type: String
     Default: 10.10.0.0/16
+    Description: CIDR block for entire VPC.
+    Type: String
   PublicSubnetCIDR:
     AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
     ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
-    Description: CIDR block for the Public Subnet
-    Type: String
     Default: 10.10.10.0/24
+    Description: CIDR block for the public subnet
+    Type: String
   SSHLocation:
-    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(/[0-9]|[1-2][0-9]|3[0-2]))$
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(/([0-9]|[1-2][0-9]|3[0-2]))$
     ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/0-28
     Default: 0.0.0.0/0
-    Description: Network Allowed to SSH to instances in public subnet
+    Description: Network allowed to ssh to instances in public subnet.
     Type: String
-Mappings: {}
-Conditions: {}
+Mappings:
+  RegionMap:
+    us-east-1:
+      HVM64: ami-0761dd91277e34178
+    us-east-2:
+      HVM64: ami-0f4aeaec5b3ce9152
 Resources:
   VPC:
     Type: AWS::EC2::VPC
@@ -47,7 +60,8 @@ Resources:
         Ref: VPCCIDR
       Tags:
         - Key: Name
-          Value: TestingVPC
+          Value:
+            Ref: VPCNAME
         - Key: CloudFormationStack
           Value:
             Ref: AWS::StackId
@@ -56,7 +70,28 @@ Resources:
     Properties:
       Tags:
         - Key: Name
-          Value: IGW
+          Value:
+            Fn::Join:
+              - "-"
+              - - Ref: VPCNAME
+                - -IGW
+        - Key: CloudFormationStack
+          Value:
+            Ref: AWS::StackId
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC
+      CidrBlock:
+        Ref: PublicSubnetCIDR
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Join:
+              - ""
+              - - "Public "
+                - Ref: PublicSubnetCIDR
         - Key: CloudFormationStack
           Value:
             Ref: AWS::StackId
@@ -67,27 +102,6 @@ Resources:
         Ref: VPC
       InternetGatewayId:
         Ref: InternetGateway
-  PublicSubnet:
-    Type: AWS::EC2::Subnet
-    Properties:
-      AvailabilityZone:
-        Fn::Select:
-          - 0
-          - Fn::GetAZs: ""
-      VpcId:
-        Ref: VPC
-      CidrBlock:
-        Ref: PublicSubnetCIDR
-      Tags:
-        - Key: Name
-          Value:
-            Fn::Join:
-              - ""
-              - - Public
-                - Ref: PublicSubnetCIDR
-        - Key: CloudFormationStack
-          Value:
-            Ref: AWS::StackId
   PublicSubnetRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -98,7 +112,7 @@ Resources:
           Value:
             Fn::Join:
               - ""
-              - - Public
+              - - "Public "
                 - Ref: PublicSubnetCIDR
         - Key: CloudFormationStack
           Value:
@@ -112,7 +126,7 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId:
         Ref: InternetGateway
-  PublicSubnetRouteTableAssosiation:
+  PublicSubnetRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId:
@@ -122,7 +136,9 @@ Resources:
   PublicInstanceSG:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Enable SSH Via Port 22
+      VpcId:
+        Ref: VPC
+      GroupDescription: Enable SSH access via port 22
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 22
@@ -133,32 +149,51 @@ Resources:
           FromPort: 80
           ToPort: 80
           CidrIp: 0.0.0.0/0
-      VpcId:
-        Ref: VPC
       Tags:
         - Key: Name
           Value:
             Fn::Join:
               - ""
-              - - PublicSG
+              - - "PublicSG "
                 - Ref: VPCCIDR
         - Key: CloudFormationStack
           Value:
             Ref: AWS::StackId
+  WebServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId:
+        Fn::FindInMap:
+          - RegionMap
+          - Ref: AWS::Region
+          - HVM64
+      InstanceType: t2.nano
+      KeyName: LaptopKey
+      Tags:
+        - Key: Name
+          Value: Server-1
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: "0"
+          DeleteOnTermination: true
+          SubnetId:
+            Ref: PublicSubnet
+          GroupSet:
+            - Ref: PublicInstanceSG
 Outputs:
   VPCId:
-    Description: VPCId of the Newly Created VPC
+    Description: VPCId of the newly created VPC
     Value:
       Ref: VPC
-  PublicSubnetId:
-    Description: "SubnetId of PublicSubnet "
+  PublicSubnet:
+    Description: SubnetId of the public subnet
     Value:
       Ref: PublicSubnet
   PublicSubnetRouteTable:
-    Description: Public Route Table
+    Description: Public route table
     Value:
       Ref: PublicSubnetRouteTable
   PublicInstanceSG:
-    Description: SG for instances in Public Subnet
+    Description: SG for instances in public subnet
     Value:
       Ref: PublicInstanceSG
