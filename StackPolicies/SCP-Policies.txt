@@ -1,0 +1,73 @@
+{
+	"Version": "2012-10-17",
+	"Statement": [
+    	{
+        	"Sid": "Statement1",
+        	"Effect": "Deny",
+        	"Action": [
+            	"iam:*"
+        	],
+        	"Resource": "*"
+    	}
+	]
+}
+
+====================================================
+{
+	"Version": "2012-10-17",
+	"Statement": [
+    	{
+        	"Sid": "Statement1",
+        	"Effect": "Allow",
+        	"Action": [
+            	"iam:*"
+        	],
+        	"Resource": "*"
+    	},
+    	{
+        	"Sid": "Statement2",
+        	"Effect": "Deny",
+        	"Action": [
+            	"iam:CreateGroup",
+            	"iam:CreateUser",
+            	"iam:CreateRole",
+            	"iam:DeleteUser",
+            	"iam:DeleteRole",
+            	"iam:DeleteGroup"
+        	],
+        	"Resource": "*"
+    	}
+	]
+}
+================================================
+{
+	"Version": "2012-10-17",
+	"Statement": [
+    	{
+        	"Sid": "AllowAll",
+        	"Effect": "Allow",
+        	"Action": "*",
+        	"Resource": "*"
+    	},
+    	{
+        	"Sid": "DenyIAM",
+        	"Effect": "Deny",
+        	"Action": [
+            	"iam:*"
+        	],
+        	"Resource": "*"
+    	},
+    	{
+        	"Sid": "DenyEC2",
+        	"Effect": "Deny",
+        	"Action": [
+            	"ec2:*"
+        	],
+        	"Resource": "*"
+    	}
+	]
+}
+
+######################################################################################################
+Applying stack policy to Existing CloudFormation Stack:
+aws cloudformation set-stack-policy --stack-name ENGAWSB06-STACK-1 --stack-policy-body file://stack-policy.json
